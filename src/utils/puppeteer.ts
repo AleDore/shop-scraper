@@ -1,3 +1,6 @@
+/* eslint-disable functional/no-let */
+/* eslint-disable no-var */
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { Browser, ElementHandle, Page } from "puppeteer";
 import * as TE from "fp-ts/lib/TaskEither";
 import { toError } from "fp-ts/lib/Either";
@@ -8,8 +11,8 @@ export const launchBrowser = () =>
   TE.tryCatch(
     () =>
       puppeteer.launch({
-        headless: true,
         args: ["--disable-setuid-sandbox"],
+        headless: "new",
         ignoreHTTPSErrors: true,
       }),
     toError
@@ -19,21 +22,18 @@ export const openNewPage = (browser: Browser) =>
   TE.tryCatch(() => browser.newPage(), toError);
 
 export const setViewPort = (page: Page) =>
-  TE.tryCatch(() => page.setViewport({ width: 1920, height: 1080 }), toError);
+  TE.tryCatch(() => page.setViewport({ height: 1080, width: 1920 }), toError);
 
 export const goToUrl = (page: Page, url: string) =>
   TE.tryCatch(
-    () => page.goto(url, { waitUntil: "networkidle2", timeout: 0 }),
+    () => page.goto(url, { timeout: 0, waitUntil: "networkidle2" }),
     toError
   );
 
 export const awaitForSelector = (selector: string) => (page: Page) =>
   pipe(
     TE.tryCatch(() => page.waitForSelector(selector, { timeout: 0 }), toError),
-    TE.map(() => {
-      console.log("awaited for selector");
-      return page;
-    })
+    TE.map(() => page)
   );
 
 export const loadPage = (url: string) => (browser: Browser) =>
@@ -48,33 +48,40 @@ export const loadPage = (url: string) => (browser: Browser) =>
     )
   );
 
-
-  export const autoScroll = (maxScrolls: number) => (page: Page) =>
-    pipe(
-      TE.tryCatch(() => page.evaluate((maxScrolls) => {
-        var totalHeight = 0;
-        var distance = 100;
-        var scrolls = 0;  // scrolls counter
-        var timer = setInterval(() => {
-            var scrollHeight = document.body.scrollHeight;
+export const autoScroll = (maxScrolls: number) => (page: Page) =>
+  pipe(
+    TE.tryCatch(
+      () =>
+        // eslint-disable-next-line @typescript-eslint/no-shadow
+        page.evaluate((maxScrolls) => {
+          let totalHeight = 0;
+          const distance = 100;
+          let scrolls = 0; // scrolls counter
+          var timer = setInterval(() => {
+            const scrollHeight = document.body.scrollHeight;
             window.scrollBy(0, distance);
             totalHeight += distance;
-            scrolls++;  // increment counter
+            scrolls++; // increment counter
 
             // stop scrolling if reached the end or the maximum number of scrolls
-            if(totalHeight >= scrollHeight - window.innerHeight || scrolls >= maxScrolls){
-                clearInterval(timer);
-
+            if (
+              totalHeight >= scrollHeight - window.innerHeight ||
+              scrolls >= maxScrolls
+            ) {
+              clearInterval(timer);
             }
-        }, 100);
-  }, maxScrolls), toError),
+          }, 100);
+        }, maxScrolls),
+      toError
+    ),
     TE.map(() => page)
   );
 
-
-
 export const evaluatePage =
-  <T>(fn: (...args: unknown[]) => T, ...args: unknown[]) =>
+  <T>(
+    fn: (...args: ReadonlyArray<unknown>) => T,
+    ...args: ReadonlyArray<unknown>
+  ) =>
   (page: Page) =>
     pipe(
       TE.tryCatch(() => page.evaluate(fn, ...args), toError),
@@ -82,15 +89,12 @@ export const evaluatePage =
     );
 
 export const evaluatePageElements =
-  <T>(fn: (...args: unknown[]) => T, ...args: unknown[]) =>
+  <T>(
+    fn: (...args: ReadonlyArray<unknown>) => T,
+    ...args: ReadonlyArray<unknown>
+  ) =>
   (page: Page) =>
-    pipe(
-      TE.tryCatch(() => page.evaluate(fn, ...args), toError),
-      TE.map((_) => {
-        console.log("Evaluated Page Elements");
-        return _;
-      })
-    );
+    TE.tryCatch(() => page.evaluate(fn, ...args), toError);
 
 export const evaluateLeftClick = (selector: string) => (page: Page) =>
   pipe(
@@ -109,14 +113,15 @@ export const changeInputValueByKeyboard =
 
 export const evaluateElement = <T>(
   element: ElementHandle<Element>,
-  fn: (el: Element, ...args: unknown[]) => T,
-  ...args: unknown[]
+  fn: (el: Element, ...args: ReadonlyArray<unknown>) => T,
+  ...args: ReadonlyArray<unknown>
 ) => TE.tryCatch(() => element.evaluate(fn, ...args), toError);
 
 export const removeModal = (page: Page, selectorToRemove: string) =>
   evaluatePage((sel: string) => {
-    var elements = document.querySelectorAll(sel);
-    for (var i = 0; i < elements.length; i++) {
+    const elements = document.querySelectorAll(sel);
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
+    for (let i = 0; i < elements.length; i++) {
       elements[i].parentNode.removeChild(elements[i]);
     }
   }, selectorToRemove)(page);
