@@ -16,6 +16,7 @@ import { readableReport } from "./logging";
 export type IConfig = t.TypeOf<typeof IConfig>;
 export const IConfig = t.type({
   AMAZON_SEARCH_URL: NonEmptyString,
+  EBAY_SEARCH_URL: NonEmptyString,
   isProduction: t.boolean,
 });
 
