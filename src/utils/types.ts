@@ -8,3 +8,9 @@ export const SearchPayload = t.type({
 });
 
 export type SearchPayload = t.TypeOf<typeof SearchPayload>;
+
+export const RequestMessagePayload = t.type({
+  requestId: t.string,
+  searchPayload: SearchPayload,
+});
+export type RequestMessagePayload = t.TypeOf<typeof RequestMessagePayload>;
