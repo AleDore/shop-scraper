@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import * as E from "fp-ts/lib/Either";
 import * as TE from "fp-ts/lib/TaskEither";
 import * as express from "express";
@@ -9,6 +10,7 @@ import { SearchPayload } from "./utils/types";
 import ebaySearch from "./EbayScrape";
 import { RedisClientMode, RedisClientSelector } from "./utils/redis";
 import { getConfigOrThrow } from "./utils/config";
+import { createRequestSubscriber } from "./subscribers/requestSub";
 
 const config = getConfigOrThrow();
 
@@ -40,8 +42,19 @@ export const createApp = async () => {
       E.toError
     ),
     TE.map((selector) => selector.selectOne(RedisClientMode.FAST)),
-    TE.getOrElse(() => {
-      throw new Error("Cannot Get Redis Client");
+    TE.mapLeft((e) => Error(`Cannot Get Redis Client|${String(e)}`)),
+    TE.bindTo("redisClient"),
+    TE.chain(({ redisClient }) =>
+      pipe(
+        createRequestSubscriber(redisClient),
+        TE.mapLeft((e) =>
+          Error(`Error while subscribing Redis Client to PubSub|${String(e)}`)
+        ),
+        TE.map(() => redisClient)
+      )
+    ),
+    TE.getOrElse((err) => {
+      throw err;
     })
   )();
 
@@ -81,21 +94,21 @@ export const createApp = async () => {
         pipe(
           TE.tryCatch(
             () =>
-              REDIS_CLIENT.publish(
-                "searchRequest",
-                JSON.stringify({
-                  requestId,
-                  searchPayload,
-                })
+              REDIS_CLIENT.set(
+                requestId,
+                JSON.stringify({ status: "ACCEPTED" })
               ),
             E.toError
           ),
           TE.chain(() =>
             TE.tryCatch(
               () =>
-                REDIS_CLIENT.set(
-                  requestId,
-                  JSON.stringify({ status: "ACCEPTED" })
+                REDIS_CLIENT.publish(
+                  "searchRequest",
+                  JSON.stringify({
+                    requestId,
+                    searchPayload,
+                  })
                 ),
               E.toError
             )

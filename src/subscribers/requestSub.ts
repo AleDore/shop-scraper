@@ -6,7 +6,7 @@ import { errorsToReadableMessages } from "@pagopa/ts-commons/lib/reporters";
 import { searchAllShop } from "../utils/search";
 import { RequestMessagePayload } from "../utils/types";
 
-export const searchRequestListener =
+const searchRequestListener =
   (redisClient: RedisClusterType) =>
   async (_: unknown, message: unknown): Promise<void> =>
     await pipe(
