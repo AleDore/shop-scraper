@@ -125,3 +125,5 @@ export const createApp = async () => {
     console.log(`Example app listening on port ${port}`);
   });
 };
+
+createApp().then(console.log).catch(console.error);
