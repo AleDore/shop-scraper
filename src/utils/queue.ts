@@ -1,4 +1,4 @@
-import { QueueClient } from "@azure/storage-queue";
+import { QueueClient, QueueServiceClient } from "@azure/storage-queue";
 
 import { constVoid, flow, pipe } from "fp-ts/lib/function";
 import * as TE from "fp-ts/lib/TaskEither";
@@ -56,4 +56,12 @@ export const dequeue = <A, S>(
         AR.sequence(TE.ApplicativePar)
       )
     )
+  );
+
+export const getQueueClient = (
+  connectionUrl: string,
+  queueName: string
+): QueueClient =>
+  pipe(new QueueServiceClient(connectionUrl), (queueServiceClient) =>
+    queueServiceClient.getQueueClient(queueName)
   );
