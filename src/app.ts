@@ -8,14 +8,12 @@ import { pipe } from "fp-ts/lib/function";
 import amazonSearch from "./AmazonScrape";
 import { SearchPayload } from "./utils/types";
 import ebaySearch from "./EbayScrape";
-import { RedisClientMode, RedisClientSelector } from "./utils/redis";
+import { createSimpleRedisClient } from "./utils/redis";
 import { getConfigOrThrow } from "./utils/config";
-import { createRequestSubscriber } from "./subscribers/requestSub";
-
-const config = getConfigOrThrow();
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export const createApp = async () => {
+  const config = getConfigOrThrow();
   const app = express();
   const port = 3000;
   // Parse the incoming request body. This is needed by Passport spid strategy.
@@ -31,32 +29,25 @@ export const createApp = async () => {
   // Parse an urlencoded body.
   app.use(bodyParser.urlencoded({ extended: true }));
 
-  const REDIS_CLIENT = await pipe(
-    TE.tryCatch(
-      () =>
-        RedisClientSelector(false)(
-          config.REDIS_URL,
-          config.REDIS_PASSWORD,
-          config.REDIS_PORT
-        ),
-      E.toError
-    ),
-    TE.map((selector) => selector.selectOne(RedisClientMode.FAST)),
-    TE.mapLeft((e) => Error(`Cannot Get Redis Client|${String(e)}`)),
-    TE.bindTo("redisClient"),
-    TE.chain(({ redisClient }) =>
-      pipe(
-        createRequestSubscriber(redisClient),
-        TE.mapLeft((e) =>
-          Error(`Error while subscribing Redis Client to PubSub|${String(e)}`)
-        ),
-        TE.map(() => redisClient)
-      )
-    ),
-    TE.getOrElse((err) => {
-      throw err;
-    })
-  )();
+  app.get("/info", (_: express.Request, res) =>
+    res.status(200).json({ status: "OK" })
+  );
+
+  app.post("/redis", (_: express.Request, res) =>
+    pipe(
+      TE.tryCatch(
+        () =>
+          createSimpleRedisClient(false)(
+            config.REDIS_URL,
+            config.REDIS_PASSWORD,
+            config.REDIS_PORT
+          ),
+        E.toError
+      ),
+      TE.map(() => res.status(200).json({ status: "OK" })),
+      TE.mapLeft((err) => res.status(500).json({ error: String(err) }))
+    )()
+  );
 
   app.post("/amazon", (req: express.Request, res) =>
     pipe(
@@ -90,31 +81,6 @@ export const createApp = async () => {
       TE.fromEither,
       TE.bindTo("searchPayload"),
       TE.bind("requestId", () => pipe(ulid.ulid(), TE.right)),
-      TE.bind("redisResponse", ({ searchPayload, requestId }) =>
-        pipe(
-          TE.tryCatch(
-            () =>
-              REDIS_CLIENT.set(
-                requestId,
-                JSON.stringify({ status: "ACCEPTED" })
-              ),
-            E.toError
-          ),
-          TE.chain(() =>
-            TE.tryCatch(
-              () =>
-                REDIS_CLIENT.publish(
-                  "searchRequest",
-                  JSON.stringify({
-                    requestId,
-                    searchPayload,
-                  })
-                ),
-              E.toError
-            )
-          )
-        )
-      ),
       TE.map(({ requestId }) => res.status(202).json({ requestId })),
       TE.mapLeft((err) => res.status(500).json({ error: String(err) }))
     )()

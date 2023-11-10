@@ -1,5 +1,5 @@
 import { constVoid, pipe } from "fp-ts/lib/function";
-import { RedisClusterType } from "redis";
+import { RedisClientType } from "redis";
 import * as TE from "fp-ts/TaskEither";
 import * as E from "fp-ts/Either";
 import { errorsToReadableMessages } from "@pagopa/ts-commons/lib/reporters";
@@ -7,7 +7,7 @@ import { searchAllShop } from "../utils/search";
 import { RequestMessagePayload } from "../utils/types";
 
 const searchRequestListener =
-  (redisClient: RedisClusterType) =>
+  (redisClient: RedisClientType) =>
   async (_: unknown, message: unknown): Promise<void> =>
     await pipe(
       message,
@@ -41,7 +41,7 @@ const searchRequestListener =
     )();
 
 export const createRequestSubscriber = (
-  redisClient: RedisClusterType
+  redisClient: RedisClientType
 ): TE.TaskEither<Error, void> =>
   TE.tryCatch(
     () =>
