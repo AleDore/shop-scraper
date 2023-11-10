@@ -42,7 +42,6 @@ export const createSimpleRedisClient =
     const completeRedisUrl = `${prefixUrl}:${password}@${redisUrl}`;
 
     const redisPort: number = parseInt(port || DEFAULT_REDIS_PORT, 10);
-    console.log(`${completeRedisUrl}:${redisPort}`);
     const redisClient = redis.createClient<
       Record<string, never>,
       Record<string, never>,
@@ -98,7 +97,10 @@ export const createClusterRedisClient =
 export const getRedisClient =
   (redisUrl: NonEmptyString, redisPassword: string, redisPort: string) =>
   (
-    subscribeFn: (client: redis.RedisClientType) => TE.TaskEither<Error, void>
+    subscribeFn: (
+      subscriberClient: redis.RedisClientType,
+      client: redis.RedisClientType
+    ) => TE.TaskEither<Error, void>
   ): T.Task<redis.RedisClientType> =>
     pipe(
       TE.tryCatch(
@@ -108,9 +110,25 @@ export const getRedisClient =
       ),
       TE.mapLeft((e) => Error(`Cannot Get Redis Client|${String(e)}`)),
       TE.bindTo("redisClient"),
-      TE.chain(({ redisClient }) =>
+      TE.bind("subscriberClient", () =>
         pipe(
-          subscribeFn(redisClient),
+          TE.tryCatch(
+            () =>
+              createSimpleRedisClient(false)(
+                redisUrl,
+                redisPassword,
+                redisPort
+              ),
+            E.toError
+          ),
+          TE.mapLeft((e) =>
+            Error(`Cannot Get Subscriber Redis Client|${String(e)}`)
+          )
+        )
+      ),
+      TE.chain(({ redisClient, subscriberClient }) =>
+        pipe(
+          subscribeFn(subscriberClient, redisClient),
           TE.mapLeft((e) =>
             Error(`Error while subscribing Redis Client to PubSub|${String(e)}`)
           ),

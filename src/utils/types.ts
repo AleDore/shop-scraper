@@ -14,3 +14,23 @@ export const RequestMessagePayload = t.type({
   searchPayload: SearchPayload,
 });
 export type RequestMessagePayload = t.TypeOf<typeof RequestMessagePayload>;
+
+export const PendingSearchResults = t.type({
+  status: t.literal("PENDING"),
+});
+export const OkSearchResults = t.type({
+  results: t.array(t.unknown),
+  status: t.literal("OK"),
+});
+export type OkSearchResults = t.TypeOf<typeof OkSearchResults>;
+export const KoSearchResults = t.type({
+  error: t.string,
+  status: t.literal("KO"),
+});
+
+export const SearchResults = t.union([
+  PendingSearchResults,
+  KoSearchResults,
+  OkSearchResults,
+]);
+export type SearchResults = t.TypeOf<typeof SearchResults>;
