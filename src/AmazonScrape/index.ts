@@ -1,15 +1,13 @@
-import { NonEmptyString } from "@pagopa/ts-commons/lib/strings";
-import { NonNegativeInteger } from "@pagopa/ts-commons/lib/numbers";
 import * as TE from "fp-ts/TaskEither";
 import { getConfigOrThrow } from "../utils/config";
+import { SearchPayload } from "../utils/types";
 import { scrapeAmazonHandler } from "./handler";
 
 const config = getConfigOrThrow();
 
 export const amazonSearch = (
-  toSearch: NonEmptyString,
-  numberOfPages: NonNegativeInteger = 1 as NonNegativeInteger
+  searchPayload: SearchPayload
 ): TE.TaskEither<Error, ReadonlyArray<unknown>> =>
-  scrapeAmazonHandler(config.AMAZON_SEARCH_URL, toSearch, numberOfPages);
+  scrapeAmazonHandler(config.AMAZON_SEARCH_URL, searchPayload);
 
 export default amazonSearch;

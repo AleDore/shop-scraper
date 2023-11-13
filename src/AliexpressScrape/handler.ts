@@ -11,7 +11,7 @@ import {
 } from "../utils/puppeteer";
 import { SearchPayload } from "../utils/types";
 
-export const scrapeEbayHandler = (
+export const scrapeAliExpressHandler = (
   url: NonEmptyString,
   searchPayload: SearchPayload
 ): TE.TaskEither<Error, ReadonlyArray<unknown>> =>
@@ -25,35 +25,35 @@ export const scrapeEbayHandler = (
           pipe(
             browser,
             loadPage(
-              `${url}/s?_nkw=${encodeURIComponent(
-                searchPayload.toSearch
-              )}&_pgn=${resPage}`
+              `${url}/w/wholesale-${searchPayload.toSearch
+                .split(" ")
+                .join("-")}.html?page=${resPage}`
             ),
-            TE.chain(awaitForSelector("div[class*='srp-river-results']")),
+            TE.chain(awaitForSelector("div[id='card-list']")),
             TE.chain(autoScroll(200)),
             TE.chain(
               evaluatePageElements(() => {
                 const pageResults = document.querySelectorAll(
-                  "div[class*='s-item__wrapper']"
+                  "a[class*='search-card-item']"
                 );
                 // eslint-disable-next-line no-useless-escape
                 const re = /<\!--.*?-->/g;
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const [_, ...results] = Array.from(pageResults);
-                return results.map((res) => ({
+                return Array.from(pageResults).map((res) => ({
                   description: res
                     .querySelector(
-                      "div[class*='s-item__title'] > span[role='heading']"
+                      "div[class*='multi--title'] > h1[class*='multi--titleText']"
                     )
                     ?.innerHTML.replace(re, "")
                     .replace(/<.*>/, ""),
                   imageUrl: res
-                    .querySelector("div[class*='s-item__image-wrapper']")
-                    .getElementsByTagName("img")[0].src,
-                  price: res
-                    .querySelector("span[class*='s-item__price']")
-                    ?.innerHTML.replace(re, "")
-                    .replace(/<.*>/, ""),
+                    .querySelector("div[class*='images--imageWindow']")
+                    ?.getElementsByTagName("img")[0]?.src,
+                  price: Array.from(
+                    res.querySelector("div[class*='multi--price-sale']")
+                      ?.children
+                  )
+                    .map((e) => e.innerHTML)
+                    .join(""),
                 }));
               })
             ),

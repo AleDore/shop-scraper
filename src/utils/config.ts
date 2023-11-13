@@ -12,13 +12,31 @@ import { pipe } from "fp-ts/lib/function";
 import { NonEmptyString } from "@pagopa/ts-commons/lib/strings";
 import { readableReport } from "./logging";
 
+export const IRedisConfig = t.type({
+  REDIS_PASSWORD: t.string,
+  REDIS_PORT: t.string,
+  REDIS_URL: NonEmptyString,
+});
+export type IRedisConfig = t.TypeOf<typeof IRedisConfig>;
+
+export const IStorageAccountConfig = t.type({
+  SEARCH_REQUEST_QUEUE_NAME: NonEmptyString,
+  STORAGE_CONN_STRING: NonEmptyString,
+});
+export type IStorageAccountConfig = t.TypeOf<typeof IStorageAccountConfig>;
+
 // global app configuration
 export type IConfig = t.TypeOf<typeof IConfig>;
-export const IConfig = t.type({
-  AMAZON_SEARCH_URL: NonEmptyString,
-  EBAY_SEARCH_URL: NonEmptyString,
-  isProduction: t.boolean,
-});
+export const IConfig = t.intersection([
+  t.type({
+    ALIEXPRESS_SEARCH_URL: NonEmptyString,
+    AMAZON_SEARCH_URL: NonEmptyString,
+    EBAY_SEARCH_URL: NonEmptyString,
+    isProduction: t.boolean,
+  }),
+  IRedisConfig,
+  IStorageAccountConfig,
+]);
 
 // No need to re-evaluate this object for each call
 const errorOrConfig: t.Validation<IConfig> = IConfig.decode({

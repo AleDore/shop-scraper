@@ -1,0 +1,53 @@
+version: "2.2"
+
+services:
+  backend:
+    container_name: shop-scraper
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    environment:
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    env_file:
+      - .dockerenv
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000"
+    image: node:18.13.0-alpine
+    command: ["yarn", "start"]
+    volumes:
+      - "./:/usr/src/app"
+    networks:
+      - shop-be
+  
+  redis:
+    image: redis:7.2.3
+    networks:
+      - shop-be
+    expose:
+      - 6379
+    ports:
+      - "6379:6379"
+    command: '--requirepass redis'
+
+  storage:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: storage
+    restart: always
+    command: "azurite --blobHost 0.0.0.0 --blobPort 20003 --queueHost 0.0.0.0 --queuePort 20004 --tableHost 0.0.0.0 --tablePort 20005"
+    ports:
+      - "20003:20003"
+      - "20004:20004"
+      - "20005:20005"
+    networks:
+       - shop-be
+
+networks:
+  shop-be:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450
+volumes:
+    redis-data:
