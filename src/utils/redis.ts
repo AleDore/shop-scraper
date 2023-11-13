@@ -94,6 +94,22 @@ export const createClusterRedisClient =
     return redisClient;
   };
 
+export const getSimpleRedisClient = (
+  redisUrl: NonEmptyString,
+  redisPassword: string,
+  redisPort: string
+): T.Task<redis.RedisClientType> =>
+  pipe(
+    TE.tryCatch(
+      () => createSimpleRedisClient(false)(redisUrl, redisPassword, redisPort),
+      E.toError
+    ),
+    TE.mapLeft((e) => Error(`Cannot Get Redis Client|${String(e)}`)),
+    TE.getOrElse((err) => {
+      throw err;
+    })
+  );
+
 export const getRedisClient =
   (redisUrl: NonEmptyString, redisPassword: string, redisPort: string) =>
   (

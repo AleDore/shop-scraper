@@ -9,11 +9,16 @@ import * as ulid from "ulid";
 import { flow, pipe } from "fp-ts/lib/function";
 import { errorsToReadableMessages } from "@pagopa/ts-commons/lib/reporters";
 import amazonSearch from "./AmazonScrape";
-import { SearchPayload, SearchResults } from "./utils/types";
+import {
+  RequestMessagePayload,
+  SearchPayload,
+  SearchResults,
+} from "./utils/types";
 import ebaySearch from "./EbayScrape";
 import { getConfigOrThrow } from "./utils/config";
-import { getRedisClient } from "./utils/redis";
-import { createRequestSubscriber } from "./subscribers/requestSub";
+import { getSimpleRedisClient } from "./utils/redis";
+import { createQueueListener, enqueue, getQueueClient } from "./utils/queue";
+import { requestMessageHandler } from "./listeners/queue";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export const createApp = async () => {
@@ -33,11 +38,23 @@ export const createApp = async () => {
   // Parse an urlencoded body.
   app.use(bodyParser.urlencoded({ extended: true }));
 
-  const REDIS_CLIENT = await getRedisClient(
+  const REDIS_CLIENT = await getSimpleRedisClient(
     config.REDIS_URL,
     config.REDIS_PASSWORD,
     config.REDIS_PORT
-  )(createRequestSubscriber)();
+  )();
+
+  const QUEUE_CLIENT = await getQueueClient(
+    config.STORAGE_CONN_STRING,
+    config.SEARCH_REQUEST_QUEUE_NAME
+  )();
+
+  createQueueListener(QUEUE_CLIENT, 5000)(
+    RequestMessagePayload,
+    requestMessageHandler(REDIS_CLIENT)
+  ).catch(console.error);
+
+  const enqueueMessage = enqueue(QUEUE_CLIENT);
 
   app.get("/info", (_: express.Request, res) =>
     res.status(200).json({ status: "OK" })
@@ -86,14 +103,7 @@ export const createApp = async () => {
             E.toError
           ),
           TE.chain(() =>
-            TE.tryCatch(
-              () =>
-                REDIS_CLIENT.publish(
-                  "searchRequest",
-                  JSON.stringify({ requestId, searchPayload })
-                ),
-              E.toError
-            )
+            enqueueMessage(JSON.stringify({ requestId, searchPayload }))
           )
         )
       ),

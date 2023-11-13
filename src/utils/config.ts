@@ -18,6 +18,13 @@ export const IRedisConfig = t.type({
   REDIS_URL: NonEmptyString,
 });
 export type IRedisConfig = t.TypeOf<typeof IRedisConfig>;
+
+export const IStorageAccountConfig = t.type({
+  SEARCH_REQUEST_QUEUE_NAME: NonEmptyString,
+  STORAGE_CONN_STRING: NonEmptyString,
+});
+export type IStorageAccountConfig = t.TypeOf<typeof IStorageAccountConfig>;
+
 // global app configuration
 export type IConfig = t.TypeOf<typeof IConfig>;
 export const IConfig = t.intersection([
@@ -28,6 +35,7 @@ export const IConfig = t.intersection([
     isProduction: t.boolean,
   }),
   IRedisConfig,
+  IStorageAccountConfig,
 ]);
 
 // No need to re-evaluate this object for each call

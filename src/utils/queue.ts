@@ -1,13 +1,16 @@
+/* eslint-disable no-console */
 import { QueueClient, QueueServiceClient } from "@azure/storage-queue";
 
 import { constVoid, flow, pipe } from "fp-ts/lib/function";
 import * as TE from "fp-ts/lib/TaskEither";
 import * as T from "fp-ts/lib/Task";
+import * as B from "fp-ts/lib/boolean";
 import * as E from "fp-ts/lib/Either";
 import * as AR from "fp-ts/lib/Array";
 import * as J from "fp-ts/lib/Json";
 import * as t from "io-ts";
 import { errorsToReadableMessages } from "@pagopa/ts-commons/lib/reporters";
+import { asyncIteratorToArray } from "./async";
 
 export const enqueue =
   (queueClient: QueueClient) =>
@@ -65,9 +68,34 @@ export const dequeue =
 export const getQueueClient = (
   connectionUrl: string,
   queueName: string
-): QueueClient =>
-  pipe(new QueueServiceClient(connectionUrl), (queueServiceClient) =>
-    queueServiceClient.getQueueClient(queueName)
+): T.Task<QueueClient> =>
+  pipe(
+    QueueServiceClient.fromConnectionString(connectionUrl),
+    (queueServiceClient) =>
+      pipe(
+        queueServiceClient.listQueues(),
+        (iter) => TE.tryCatch(() => asyncIteratorToArray(iter), E.toError),
+        TE.map((queueItems) =>
+          queueItems.map((queueItem) => queueItem.name).includes(queueName)
+        ),
+        TE.chain(
+          B.fold(
+            () =>
+              pipe(
+                TE.tryCatch(
+                  () => queueServiceClient.createQueue(queueName),
+                  E.toError
+                ),
+                TE.map(constVoid)
+              ),
+            () => TE.right<Error, void>(void 0)
+          )
+        ),
+        TE.map(() => queueServiceClient.getQueueClient(queueName))
+      ),
+    TE.getOrElse((err) => {
+      throw err;
+    })
   );
 
 const delay = (pollingIntervalMs: number): TE.TaskEither<never, void> =>
@@ -86,7 +114,10 @@ export const createQueueListener =
         TE.mapLeft((e) =>
           Error(`Error while processing item dequeue|ERROR=${String(e)}`)
         ),
-        TE.orElseW(() => delay(pollingIntervalMs)),
+        TE.orElseW((err) => {
+          console.error(err);
+          return delay(pollingIntervalMs);
+        }),
         TE.chain(() => delay(pollingIntervalMs))
       )();
     }
