@@ -31,13 +31,16 @@ export const createRequestSubscriber = (
           TE.fromEither,
           TE.chain(({ requestId, searchPayload }) =>
             pipe(
-              searchAllShop(searchPayload),
-              TE.chain((results) =>
+              searchAllShop(redisClient, requestId, searchPayload),
+              TE.chain(() =>
                 TE.tryCatch(
                   () =>
                     redisClient.set(
                       requestId,
-                      JSON.stringify({ results, status: "OK" })
+                      JSON.stringify({
+                        numOfPages: searchPayload.numberOfPages,
+                        status: "OK",
+                      })
                     ),
                   E.toError
                 )

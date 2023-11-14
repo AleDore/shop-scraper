@@ -11,13 +11,16 @@ export const requestMessageHandler =
     pipe(
       // eslint-disable-next-line no-console
       console.log(`requestMessagehandler => ${JSON.stringify(item)}`),
-      () => searchAllShop(item.searchPayload),
-      TE.chain((results) =>
+      () => searchAllShop(redisClient, item.requestId, item.searchPayload),
+      TE.chain(() =>
         TE.tryCatch(
           () =>
             redisClient.set(
               item.requestId,
-              JSON.stringify({ results, status: "OK" })
+              JSON.stringify({
+                numOfPages: item.searchPayload.numberOfPages,
+                status: "OK",
+              })
             ),
           E.toError
         )

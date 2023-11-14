@@ -27,40 +27,51 @@ export const dequeue =
   <A, S>(queueClient: QueueClient, decoder: t.Type<S, A>) =>
   (
     messageHandler: (item: S) => TE.TaskEither<Error, void>
-  ): TE.TaskEither<Error, ReadonlyArray<void>> =>
+  ): TE.TaskEither<Error, void> =>
     pipe(
       TE.tryCatch(() => queueClient.createIfNotExists(), E.toError),
       TE.chain(() =>
         TE.tryCatch(() => queueClient.receiveMessages(), E.toError)
       ),
       TE.map((response) => response.receivedMessageItems),
-      TE.chain((items) =>
+      TE.map(AR.head),
+      TE.chain(
+        flow(
+          TE.fromOption(() => Error("No messages to dequeue")),
+          TE.map((msg) => ({ existsMessage: true, msg })),
+          TE.orElse(() => TE.of({ existsMessage: false, msg: undefined }))
+        )
+      ),
+      TE.chain(({ existsMessage, msg }) =>
         pipe(
-          items.map((i) =>
-            pipe(
-              i.messageText,
-              J.parse,
-              E.mapLeft(E.toError),
-              E.chain(
-                flow(
-                  decoder.decode,
-                  E.mapLeft((errs) =>
-                    Error(errorsToReadableMessages(errs).join("|"))
+          existsMessage,
+          B.fold(
+            () => TE.right(void 0),
+            () =>
+              pipe(
+                msg.messageText,
+                J.parse,
+                E.mapLeft(E.toError),
+                E.chain(
+                  flow(
+                    decoder.decode,
+                    E.mapLeft((errs) =>
+                      Error(errorsToReadableMessages(errs).join("|"))
+                    )
                   )
-                )
-              ),
-              TE.fromEither,
-              TE.chain(messageHandler),
-              TE.chain(() =>
-                TE.tryCatch(
-                  () => queueClient.deleteMessage(i.messageId, i.popReceipt),
-                  E.toError
-                )
-              ),
-              TE.map(constVoid)
-            )
-          ),
-          AR.sequence(TE.ApplicativeSeq)
+                ),
+                TE.fromEither,
+                TE.chain(messageHandler),
+                TE.chain(() =>
+                  TE.tryCatch(
+                    () =>
+                      queueClient.deleteMessage(msg.messageId, msg.popReceipt),
+                    E.toError
+                  )
+                ),
+                TE.map(constVoid)
+              )
+          )
         )
       )
     );

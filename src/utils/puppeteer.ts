@@ -14,8 +14,27 @@ export const launchBrowser = () =>
         args: ["--disable-setuid-sandbox"],
         headless: "new",
         ignoreHTTPSErrors: true,
+        protocolTimeout: 0,
       }),
     toError
+  );
+
+export const closeBrowser = (browser: Browser) =>
+  TE.tryCatch(() => browser.close(), toError);
+
+export const withBrowser = <E, T>(
+  fn: (browser: Browser) => TE.TaskEither<E, T>
+) =>
+  pipe(
+    launchBrowser(),
+    TE.bindTo("browser"),
+    TE.bindW("fnResult", ({ browser }) => pipe(fn(browser))),
+    TE.chainW(({ browser, fnResult }) =>
+      pipe(
+        closeBrowser(browser),
+        TE.map(() => fnResult)
+      )
+    )
   );
 
 export const openNewPage = (browser: Browser) =>
@@ -47,6 +66,9 @@ export const loadPage = (url: string) => (browser: Browser) =>
       )
     )
   );
+
+export const closePage = (page: Page) =>
+  TE.tryCatch(() => page.close(), toError);
 
 export const autoScroll = (maxScrolls: number) => (page: Page) =>
   pipe(
