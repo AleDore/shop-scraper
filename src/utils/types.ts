@@ -19,7 +19,7 @@ export const PendingSearchResults = t.type({
   status: t.literal("PENDING"),
 });
 export const OkSearchResults = t.type({
-  results: t.array(t.unknown),
+  numOfPages: t.number,
   status: t.literal("OK"),
 });
 export type OkSearchResults = t.TypeOf<typeof OkSearchResults>;
