@@ -3,6 +3,7 @@ import * as E from "fp-ts/lib/Either";
 import * as O from "fp-ts/lib/Option";
 import * as J from "fp-ts/lib/Json";
 import * as TE from "fp-ts/lib/TaskEither";
+import * as NAR from "fp-ts/lib/NonEmptyArray";
 import * as express from "express";
 import * as bodyParser from "body-parser";
 import * as ulid from "ulid";
@@ -12,11 +13,15 @@ import {
   RequestMessagePayload,
   SearchPayload,
   SearchResults,
+  SearchResultsPage,
 } from "./utils/types";
 import { getConfigOrThrow } from "./utils/config";
 import { getSimpleRedisClient } from "./utils/redis";
 import { createQueueListener, enqueue, getQueueClient } from "./utils/queue";
 import { requestMessageHandler } from "./listeners/queue";
+import amazonSearch from "./AmazonScrape";
+import ebaySearch from "./EbayScrape";
+import { withBrowser } from "./utils/puppeteer";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export const createApp = async () => {
@@ -56,6 +61,32 @@ export const createApp = async () => {
 
   app.get("/info", (_: express.Request, res) =>
     res.status(200).json({ status: "OK" })
+  );
+
+  app.get("/sample", (_: express.Request, res) =>
+    pipe(
+      NAR.range(1, 2),
+      NAR.map((p) => ({
+        page: p,
+        searchPayload: {
+          numberOfPages: 2,
+          toSearch: "Oppo Find",
+        } as SearchPayload,
+      })),
+      NAR.map(({ page, searchPayload }) =>
+        pipe(
+          withBrowser([
+            amazonSearch(searchPayload, page),
+            ebaySearch(searchPayload, page),
+          ]),
+          TE.map(NAR.flatten)
+        )
+      ),
+      NAR.sequence(TE.ApplicativeSeq),
+      TE.map(NAR.flatten),
+      TE.map((results) => res.status(202).json({ results })),
+      TE.mapLeft((err) => res.status(500).json({ error: String(err) }))
+    )()
   );
 
   app.post("/search", (req: express.Request, res) =>
@@ -150,7 +181,7 @@ export const createApp = async () => {
           E.mapLeft(E.toError),
           E.chain(
             flow(
-              SearchResults.decode,
+              SearchResultsPage.decode,
               E.mapLeft((errs) =>
                 Error(errorsToReadableMessages(errs).join("|"))
               )

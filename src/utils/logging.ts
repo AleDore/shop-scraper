@@ -1,5 +1,5 @@
 import * as t from "io-ts";
-export const readableReport = (errors: t.Errors) =>
+export const readableReport = (errors: t.Errors): string =>
   errors
     .map(
       (e) =>

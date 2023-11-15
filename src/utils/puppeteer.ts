@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { Browser, ElementHandle, Page } from "puppeteer";
 import * as TE from "fp-ts/lib/TaskEither";
+import * as AR from "fp-ts/lib/Array";
 import { toError } from "fp-ts/lib/Either";
 import * as puppeteer from "puppeteer";
 import { pipe } from "fp-ts/lib/function";
@@ -31,12 +32,17 @@ export const closeBrowser = (browser: Browser) =>
   TE.tryCatch(() => browser.close(), toError);
 
 export const withBrowser = <E, T>(
-  fn: (browser: Browser) => TE.TaskEither<E, T>
+  fns: ReadonlyArray<(browser: Browser) => TE.TaskEither<E, T>>
 ) =>
   pipe(
     launchBrowser(),
     TE.bindTo("browser"),
-    TE.bindW("fnResult", ({ browser }) => pipe(fn(browser))),
+    TE.bindW("fnResult", ({ browser }) =>
+      pipe(
+        fns.map((fn) => fn(browser)),
+        AR.sequence(TE.ApplicativePar)
+      )
+    ),
     TE.chainW(({ browser, fnResult }) =>
       pipe(
         closeBrowser(browser),

@@ -34,3 +34,9 @@ export const SearchResults = t.union([
   OkSearchResults,
 ]);
 export type SearchResults = t.TypeOf<typeof SearchResults>;
+
+export const SearchResultsPage = t.type({
+  page: t.number,
+  results: t.readonlyArray(t.unknown),
+});
+export type SearchResultsPage = t.TypeOf<typeof SearchResultsPage>;

@@ -7,6 +7,7 @@ import amazonSearch from "../AmazonScrape";
 import ebaySearch from "../EbayScrape";
 import { SearchPayload } from "./types";
 import { delay } from "./promise";
+import { withBrowser } from "./puppeteer";
 
 export const searchAllShop = (
   redisClient: RedisClientType,
@@ -17,18 +18,17 @@ export const searchAllShop = (
     AR.range(1, searchPayload.numberOfPages),
     AR.map((pageNum) =>
       pipe(
-        [
+        withBrowser([
           amazonSearch(searchPayload, pageNum),
           ebaySearch(searchPayload, pageNum),
-        ],
-        AR.sequence(TE.ApplicativePar),
+        ]),
         TE.map(AR.flatten),
         TE.chain((results) =>
           TE.tryCatch(
             () =>
               redisClient.set(
                 `${requestId}-${pageNum}`,
-                JSON.stringify({ page: pageNum, results, status: "OK" })
+                JSON.stringify({ page: pageNum, results })
               ),
             E.toError
           )
