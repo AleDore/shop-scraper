@@ -1,9 +1,11 @@
 AMAZON_SEARCH_URL="https://www.amazon.it"
 EBAY_SEARCH_URL="https://www.ebay.it/sch/i.html"
 ALIEXPRESS_SEARCH_URL="https://it.aliexpress.com"
+ENABLE_PROXIES=false
 NODE_ENV="dev"
 REDIS_URL="redis"
 REDIS_PASSWORD="redis"
 REDIS_PORT="6379"
 STORAGE_CONN_STRING=STORAGE_CONN_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://storage:20003/devstoreaccount1;QueueEndpoint=http://storage:20004/devstoreaccount1;TableEndpoint=http://storage:20005/devstoreaccount1;
 SEARCH_REQUEST_QUEUE_NAME="search-request"
+PAGE_SEARCH_REQUEST_QUEUE_NAME="page-search-request"

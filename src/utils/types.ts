@@ -9,11 +9,22 @@ export const SearchPayload = t.type({
 
 export type SearchPayload = t.TypeOf<typeof SearchPayload>;
 
-export const RequestMessagePayload = t.type({
+export const SearchRequestMessagePayload = t.type({
   requestId: t.string,
   searchPayload: SearchPayload,
 });
-export type RequestMessagePayload = t.TypeOf<typeof RequestMessagePayload>;
+export type SearchRequestMessagePayload = t.TypeOf<
+  typeof SearchRequestMessagePayload
+>;
+
+export const PageSearchRequestMessagePayload = t.type({
+  page: t.number,
+  requestId: t.string,
+  searchPayload: SearchPayload,
+});
+export type PageSearchRequestMessagePayload = t.TypeOf<
+  typeof PageSearchRequestMessagePayload
+>;
 
 export const PendingSearchResults = t.type({
   status: t.literal("PENDING"),
