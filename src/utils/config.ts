@@ -20,6 +20,7 @@ export const IRedisConfig = t.type({
 export type IRedisConfig = t.TypeOf<typeof IRedisConfig>;
 
 export const IStorageAccountConfig = t.type({
+  PAGE_SEARCH_REQUEST_QUEUE_NAME: NonEmptyString,
   SEARCH_REQUEST_QUEUE_NAME: NonEmptyString,
   STORAGE_CONN_STRING: NonEmptyString,
 });
@@ -32,6 +33,7 @@ export const IConfig = t.intersection([
     ALIEXPRESS_SEARCH_URL: NonEmptyString,
     AMAZON_SEARCH_URL: NonEmptyString,
     EBAY_SEARCH_URL: NonEmptyString,
+    ENABLE_PROXIES: t.boolean,
     isProduction: t.boolean,
   }),
   IRedisConfig,
@@ -41,6 +43,7 @@ export const IConfig = t.intersection([
 // No need to re-evaluate this object for each call
 const errorOrConfig: t.Validation<IConfig> = IConfig.decode({
   ...process.env,
+  ENABLE_PROXIES: process.env.ENABLE_PROXIES === "true",
   isProduction: process.env.NODE_ENV === "production",
 });
 

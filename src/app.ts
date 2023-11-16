@@ -10,18 +10,23 @@ import * as ulid from "ulid";
 import { flow, pipe } from "fp-ts/lib/function";
 import { errorsToReadableMessages } from "@pagopa/ts-commons/lib/reporters";
 import {
-  RequestMessagePayload,
+  SearchRequestMessagePayload,
   SearchPayload,
   SearchResults,
   SearchResultsPage,
+  PageSearchRequestMessagePayload,
 } from "./utils/types";
 import { getConfigOrThrow } from "./utils/config";
 import { getSimpleRedisClient } from "./utils/redis";
 import { createQueueListener, enqueue, getQueueClient } from "./utils/queue";
-import { requestMessageHandler } from "./listeners/queue";
+import {
+  searchRequestMessageHandler,
+  pageRequestMessageHandler,
+} from "./listeners/queue";
 import amazonSearch from "./AmazonScrape";
 import ebaySearch from "./EbayScrape";
 import { withBrowser } from "./utils/puppeteer";
+import { initializeAndGetProxies } from "./utils/proxies";
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export const createApp = async () => {
@@ -41,6 +46,8 @@ export const createApp = async () => {
   // Parse an urlencoded body.
   app.use(bodyParser.urlencoded({ extended: true }));
 
+  const proxies = config.ENABLE_PROXIES ? await initializeAndGetProxies() : [];
+
   const REDIS_CLIENT = await getSimpleRedisClient(
     config.REDIS_URL,
     config.REDIS_PASSWORD,
@@ -52,9 +59,19 @@ export const createApp = async () => {
     config.SEARCH_REQUEST_QUEUE_NAME
   )();
 
+  const PAGE_QUEUE_CLIENT = await getQueueClient(
+    config.STORAGE_CONN_STRING,
+    config.PAGE_SEARCH_REQUEST_QUEUE_NAME
+  )();
+
   createQueueListener(QUEUE_CLIENT, 5000)(
-    RequestMessagePayload,
-    requestMessageHandler(REDIS_CLIENT)
+    SearchRequestMessagePayload,
+    searchRequestMessageHandler(PAGE_QUEUE_CLIENT)
+  ).catch(console.error);
+
+  createQueueListener(PAGE_QUEUE_CLIENT, 5000)(
+    PageSearchRequestMessagePayload,
+    pageRequestMessageHandler(REDIS_CLIENT, proxies)
   ).catch(console.error);
 
   const enqueueMessage = enqueue(QUEUE_CLIENT);
@@ -75,7 +92,7 @@ export const createApp = async () => {
       })),
       NAR.map(({ page, searchPayload }) =>
         pipe(
-          withBrowser([
+          withBrowser(proxies)([
             amazonSearch(searchPayload, page),
             ebaySearch(searchPayload, page),
           ]),

@@ -4,11 +4,14 @@
 import { Browser, ElementHandle, Page } from "puppeteer";
 import * as TE from "fp-ts/lib/TaskEither";
 import * as AR from "fp-ts/lib/Array";
+import * as O from "fp-ts/lib/Option";
 import { toError } from "fp-ts/lib/Either";
 import * as puppeteer from "puppeteer";
 import { pipe } from "fp-ts/lib/function";
+import { NonEmptyString } from "@pagopa/ts-commons/lib/strings";
+import { getRandomProxy } from "./proxies";
 
-export const launchBrowser = () =>
+export const launchBrowser = (proxyServer?: NonEmptyString) =>
   TE.tryCatch(
     () =>
       puppeteer.launch({
@@ -19,11 +22,17 @@ export const launchBrowser = () =>
           "--disable-accelerated-2d-canvas",
           "--no-first-run",
           "--no-zygote",
-          "--single-process",
           "--disable-gpu",
+          pipe(
+            proxyServer,
+            O.fromNullable,
+            O.map((server) => `--proxy-server=${server}`),
+            O.getOrElse(() => "")
+          ),
         ],
         headless: "new",
         ignoreHTTPSErrors: true,
+        protocolTimeout: 30000,
       }),
     toError
   );
@@ -31,25 +40,26 @@ export const launchBrowser = () =>
 export const closeBrowser = (browser: Browser) =>
   TE.tryCatch(() => browser.close(), toError);
 
-export const withBrowser = <E, T>(
-  fns: ReadonlyArray<(browser: Browser) => TE.TaskEither<E, T>>
-) =>
-  pipe(
-    launchBrowser(),
-    TE.bindTo("browser"),
-    TE.bindW("fnResult", ({ browser }) =>
-      pipe(
-        fns.map((fn) => fn(browser)),
-        AR.sequence(TE.ApplicativePar)
+export const withBrowser =
+  (proxyList: ReadonlyArray<NonEmptyString>) =>
+  <E, T>(fns: ReadonlyArray<(browser: Browser) => TE.TaskEither<E, T>>) =>
+    pipe(
+      getRandomProxy(proxyList),
+      (proxyServer) => launchBrowser(proxyServer),
+      TE.bindTo("browser"),
+      TE.bindW("fnResult", ({ browser }) =>
+        pipe(
+          fns.map((fn) => fn(browser)),
+          AR.sequence(TE.ApplicativePar)
+        )
+      ),
+      TE.chainW(({ browser, fnResult }) =>
+        pipe(
+          closeBrowser(browser),
+          TE.map(() => fnResult)
+        )
       )
-    ),
-    TE.chainW(({ browser, fnResult }) =>
-      pipe(
-        closeBrowser(browser),
-        TE.map(() => fnResult)
-      )
-    )
-  );
+    );
 
 export const openNewPage = (browser: Browser) =>
   TE.tryCatch(() => browser.newPage(), toError);
